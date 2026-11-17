@@ -8,7 +8,7 @@
 
 Open http://localhost:8765
 """
-import base64, html, json, os, random, re, sys, threading, time
+import base64, html, http.client, json, os, random, re, sys, threading, time
 from datetime import date, datetime, timedelta
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -228,12 +228,16 @@ def walk(part, acc):
     return acc
 
 
-def call(req):
+def call(req, resend=True):
     """execute() with backoff on Gmail per-minute quota / rate errors."""
     from googleapiclient.errors import HttpError
     for n in range(7):
         try:
             return req.execute()
+        except (OSError, http.client.HTTPException):  # Google dropped an idle keep-alive connection; a retry reconnects
+            if n >= 3 or not resend:  # never re-send mail: Google may have accepted it before the drop
+                raise
+            time.sleep(1 + n)
         except HttpError as e:
             if e.resp.status in (403, 429) and re.search(r"quota|rate", str(e), re.I) and n < 6:
                 time.sleep(min(60, 4 * 2 ** n))
@@ -318,7 +322,7 @@ def send_reply(req, decision, comment, to):
     if req.get("message_id"):
         msg["In-Reply-To"] = msg["References"] = req["message_id"]
     raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
-    call(svc.users().messages().send(userId="me", body={"raw": raw, "threadId": req["thread"]}))
+    call(svc.users().messages().send(userId="me", body={"raw": raw, "threadId": req["thread"]}), resend=False)
 
 
 def apply_label(req, decision):
