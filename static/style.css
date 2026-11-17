@@ -174,17 +174,17 @@ kbd{font-family:"JetBrains Mono";font-size:11px;padding:2px 6px;border:1px solid
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 /* phone: rows become cards so Approve/Reject are always on screen */
 @media (max-width:700px){
-  table{min-width:0}thead{display:none}
-  tbody tr{display:grid;grid-template-columns:34px 1fr auto;column-gap:8px;padding:12px 6px;border-top:1px solid var(--line)}
-  tbody tr:first-child{border-top:0}
-  td{border:0;padding:1px 0}
-  td.chk{grid-column:1;grid-row:1/span 3;align-self:center;width:auto}
-  td:nth-child(2){grid-column:2;grid-row:1}
-  td:nth-child(3){grid-column:2;grid-row:2;font-size:12px;color:var(--muted);padding-left:40px}
-  td:nth-child(4){grid-column:2;grid-row:3;font-size:12px;padding-left:40px}
-  td:nth-child(5),td:nth-child(6){display:none}
-  td:nth-child(7){grid-column:3;grid-row:1;justify-self:end}
-  td.act{grid-column:3;grid-row:2/span 2;justify-self:end;align-self:center;width:auto}
+  #tbl{min-width:0}#tbl thead{display:none}
+  #tbl tbody tr{display:grid;grid-template-columns:34px 1fr auto;column-gap:8px;padding:12px 6px;border-top:1px solid var(--line)}
+  #tbl tbody tr:first-child{border-top:0}
+  #tbl td{border:0;padding:1px 0}
+  #tbl td.chk{grid-column:1;grid-row:1/span 3;align-self:center;width:auto}
+  #tbl td:nth-child(2){grid-column:2;grid-row:1}
+  #tbl td:nth-child(3){grid-column:2;grid-row:2;font-size:12px;color:var(--muted);padding-left:40px}
+  #tbl td:nth-child(4){grid-column:2;grid-row:3;font-size:12px;padding-left:40px}
+  #tbl td:nth-child(5),#tbl td:nth-child(6){display:none}
+  #tbl td:nth-child(7){grid-column:3;grid-row:1;justify-self:end}
+  #tbl td.act{grid-column:3;grid-row:2/span 2;justify-self:end;align-self:center;width:auto}
   .tbl-wrap{min-height:1000px}  /* reserve space for 12 cards: no jump when data arrives */
   .kpis{min-height:330px}
   .chart{height:330px}  /* room for the legend under the doughnut */
@@ -196,3 +196,17 @@ kbd{font-family:"JetBrains Mono";font-size:11px;padding:2px 6px;border:1px solid
 .tpls button{text-align:left}
 dialog{width:min(560px,94vw)}
 .tpls button[aria-pressed="true"]{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 16%,var(--surface2))}
+/* team member profile */
+.card-h #pSearch{width:min(340px,100%)}
+.phead{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.phead .linkbtn{margin-left:auto}
+.pkpis{min-height:0;margin-bottom:16px}
+.pkpis .kpi{cursor:default}.pkpis .kpi:hover{transform:none}
+.pgrid{display:grid;grid-template-columns:1.3fr 1fr;gap:18px;margin-bottom:16px}
+.pwrap{overflow:auto;border:1px solid var(--line);border-radius:12px;max-height:420px}
+.ptable{min-width:0}
+.ptable td,.ptable th{padding:8px 12px}
+.ptable tbody tr{cursor:default}.ptable tbody tr[data-id]{cursor:pointer}
+.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:13px}
+.plist li{padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface2);display:flex;justify-content:space-between;gap:8px}
+@media (max-width:1100px){.pgrid{grid-template-columns:1fr}}

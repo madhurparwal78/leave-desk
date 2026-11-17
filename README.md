@@ -65,6 +65,11 @@ Mails matching the query (default `(from:greythr.com OR subject:"Leave Applicati
 - **Approved / Rejected**: someone replied in the thread (latest reply wins), or you decided here.
 - **No reply**: older than 14 days, leave already over, nobody replied by email (usually handled inside greytHR).
 
+## Team member view
+Search anyone in the **Team member** box (or *Full history* in a request's details) to see their whole record:
+leave and WFH days this year, regularizations, pending / approved / rejected counts, a breakdown by leave type,
+upcoming time off, and every request (click one for the original mail). *Show in requests table →* filters the main table to them.
+
 ## Approving (nothing is sent until you confirm the dialog)
 1. ✓ / ✕ on a row (or open it → Approve / Reject, or press `a` / `r`).
 2. **To** is pre-filled from `team.json`, never the greytHR no-reply address. **CC** comes from `config.json`.

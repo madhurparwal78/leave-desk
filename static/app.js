@@ -124,7 +124,7 @@ async function load(sync, quiet) {
   try {
     if (sync) { const s = await api("/api/refresh", {}); if (!s.ok) toast("Sync failed: " + s.error, true); else if (!quiet) toast(`Synced · ${s.count} requests`); }
     const d = await api("/api/requests");
-    all = d.requests; demo = d.demo; me = d.me || "";
+    all = d.requests; demo = d.demo; me = d.me || ""; team = d.team || {};
     $("#teamList").innerHTML = Object.entries(d.team || {}).map(([n, e]) => `<option value="${esc(e)}">${esc(n)}</option>`).join("");
     $("#mCc").textContent = (d.cc ? "Cc " + d.cc + " · " : "") + "Your Gmail signature is added below the message";
     $("#mode").textContent = demo ? "Demo data" : "● " + (d.me || "Gmail");
@@ -163,7 +163,7 @@ function sorted(rows) {
 }
 
 function render() {
-  renderKpis(); renderCharts(); renderHeat(); renderTable();
+  renderKpis(); renderCharts(); renderHeat(); renderPerson(); renderTable();
   const n = all.filter(r => r.status === "pending").length;
   document.title = (n ? `(${n}) ` : "") + "Leave Desk · greytHR";
 }
@@ -333,6 +333,56 @@ function renderTable() {
 
 function setF(patch) { Object.assign(f, patch); page = 0; focus = 0; render(); }
 
+// ---------------------------------------------------------------- team member profile
+let team = {}, person = "";
+const peopleNames = () => {  // request names + roster names, case-insensitive dedupe (greytHR spelling wins)
+  const m = new Map();
+  [...all.map(r => r.employee), ...Object.keys(team)].filter(Boolean).forEach(n => m.has(n.toLowerCase()) || m.set(n.toLowerCase(), n));
+  return [...m.values()].sort((a, b) => a.localeCompare(b));
+};
+const sumDays = rs => { const n = rs.reduce((s, r) => s + (r.days || 0), 0); return n % 1 ? +n.toFixed(1) : n; };
+const isPerm = r => /^permission/i.test(r.type || "");
+function renderPerson() {
+  $("#peopleList").innerHTML = peopleNames().map(n => `<option value="${esc(n)}">`).join("");
+  if (!person) { $("#pBody").innerHTML = `<p class="muted small">Search a name to see their full leave history, totals by type and upcoming time off.</p>`; return; }
+  const key = person.toLowerCase(), today = iso(new Date()), yr = today.slice(0, 4);
+  const rows = all.filter(r => (r.employee || "").toLowerCase() === key).sort((a, b) => (b.from || b.received).localeCompare(a.from || a.received));
+  const email = Object.entries(team).find(([n]) => n.toLowerCase() === key)?.[1] || rows.find(r => r.employee_email)?.employee_email;
+  const name = rows[0]?.employee || peopleNames().find(n => n.toLowerCase() === key) || person;
+  const head = `<div class="phead"><span class="av" style="width:40px;height:40px;font-size:13px;background:hsl(${hue(name)} 72% 74%)">${esc(initials(name))}</span>
+    <div><h3>${esc(name)}</h3><span class="muted small mono">${esc([...new Set(rows.map(r => r.emp_id).filter(Boolean))].join(" · ") || "—")} · ${esc(email || "no email in team list")}</span></div>
+    ${rows.length ? `<button type="button" class="linkbtn small" data-ptable>Show in requests table →</button>` : ""}</div>`;
+  if (!rows.length) { $("#pBody").innerHTML = head + `<p class="muted small">No leave requests from ${esc(name)} in the synced mail.</p>`; return; }
+  const live = r => r.status !== "rejected" && r.status !== "cancelled", c = s => rows.filter(r => r.status === s).length;
+  const yrRows = rows.filter(r => live(r) && (r.from || "").startsWith(yr));
+  const tiles = [
+    [`Leave days · ${yr}`, sumDays(yrRows.filter(isOff)), `${yrRows.filter(isOff).length} request(s), excl. rejected`, "--accent"],
+    [`WFH days · ${yr}`, sumDays(yrRows.filter(isWfh)), `${yrRows.filter(isWfh).length} request(s)`, "--info"],
+    ["Regularizations", rows.filter(isPerm).length, "attendance permission requests", "--stale"],
+    ["Pending", rows.filter(isOpen).length, `${c("stale")} with no reply`, "--pending"],
+    ["Approved · Rejected", `${c("approved")}·${c("rejected")}`, `${rows.length} requests in total`, "--approved"],
+  ];
+  const types = [...new Set(rows.map(r => r.type || "Unknown"))].map(t => { const rs = rows.filter(r => (r.type || "Unknown") === t);
+    return { t, n: rs.length, d: sumDays(rs.filter(live)), a: rs.filter(r => r.status === "approved").length, p: rs.filter(isOpen).length, x: rs.filter(r => r.status === "rejected").length }; }).sort((a, b) => b.d - a.d || b.n - a.n);
+  const upcoming = rows.filter(r => live(r) && !isPerm(r) && r.from && (r.to || r.from) >= today).sort((a, b) => a.from.localeCompare(b.from));
+  const badge = r => `<span class="badge ${esc(r.status)}">${esc(LABEL[r.status] || r.status)}</span>`;
+  $("#pBody").innerHTML = head +
+    `<div class="kpis pkpis">${tiles.map(([l, v, s, col]) => `<div class="kpi" style="--c:var(${col})"><div class="lbl"><i></i>${l}</div><div class="val">${v}</div><div class="sub">${s}</div></div>`).join("")}</div>
+    <div class="pgrid">
+      <div><h2 style="margin-bottom:8px">By type</h2><div class="pwrap"><table class="ptable"><thead><tr><th>Type</th><th class="num">Requests</th><th class="num">Days</th><th class="num">Approved</th><th class="num">Pending</th><th class="num">Rejected</th></tr></thead>
+        <tbody>${types.map(x => `<tr><td>${esc(x.t)}</td><td class="num">${x.n}</td><td class="num">${x.d}</td><td class="num">${x.a}</td><td class="num">${x.p}</td><td class="num">${x.x}</td></tr>`).join("")}</tbody></table></div></div>
+      <div><h2 style="margin-bottom:8px">Upcoming</h2>${upcoming.length ? `<ul class="plist">${upcoming.map(r => `<li><span>${fmt(r.from)}${r.to && r.to !== r.from ? " → " + fmt(r.to) : ""} · ${esc(r.type || "Leave")} · ${r.days ?? "?"}d</span>${badge(r)}</li>`).join("")}</ul>` : `<p class="muted small">Nothing upcoming.</p>`}</div>
+    </div>
+    <h2 style="margin-bottom:8px">All requests <span class="muted">· click a row for details</span></h2>
+    <div class="pwrap"><table class="ptable"><thead><tr><th>Dates</th><th>Type</th><th class="num">Days</th><th>Reason</th><th>Status</th><th>Applied</th><th>Decided by</th></tr></thead>
+      <tbody>${rows.map(r => `<tr data-id="${esc(r.id)}"><td>${fmt(r.from)}${r.to && r.to !== r.from ? " → " + fmt(r.to) : ""}</td><td>${esc(r.type || "—")}</td><td class="num">${r.days ?? "—"}</td>
+        <td class="muted">${esc((r.reason || "—").slice(0, 80))}</td><td>${badge(r)}</td><td class="muted" title="${esc(r.received)}">${fmt(r.received.slice(0, 10))}</td><td class="muted small">${esc(r.decided_by || "—")}</td></tr>`).join("")}</tbody></table></div>`;
+}
+function showPerson(name, scroll) {
+  person = name; $("#pSearch").value = name; renderPerson();
+  if (scroll) $("#member").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+}
+
 // ---------------------------------------------------------------- drawer
 function openDrawer(id) {
   const r = all.find(x => x.id === id); if (!r) return;
@@ -364,6 +414,7 @@ function openDrawer(id) {
       ${safeUrl(links.approve) ? `<a class="btn ghost" target="_blank" rel="noopener noreferrer" href="${esc(safeUrl(links.approve))}" title="greytHR email-approval link">Approve in greytHR ↗</a>` : ""}
       ${safeUrl(links.reject) ? `<a class="btn ghost" target="_blank" rel="noopener noreferrer" href="${esc(safeUrl(links.reject))}">Reject in greytHR ↗</a>` : ""}
       ${safeUrl(links.open) ? `<a class="btn ghost" target="_blank" rel="noopener noreferrer" href="${esc(safeUrl(links.open))}" title="greytHR approve/reject page">Review in greytHR ↗</a>` : ""}
+      <button class="btn ghost" data-person="${esc(r.employee || "")}">Full history</button>
       ${!demo ? `<a class="btn ghost" target="_blank" rel="noopener noreferrer" href="https://mail.google.com/mail/u/${encodeURIComponent(me || "0")}/#all/${esc(r.thread)}">Open in Gmail ↗</a>` : ""}
     </div>
     <h2 style="margin:18px 0 8px">Original email · <span class="muted">${esc(r.subject)}</span></h2>
@@ -507,7 +558,17 @@ $("#tbl tbody").addEventListener("click", e => {
   focus = [...tr.parentNode.children].indexOf(tr); openDrawer(id); renderTable();
 });
 $("#bulk").addEventListener("click", e => { const b = e.target.closest("[data-bulk]"); if (b) askDecision([...selected], b.dataset.bulk); });
-$("#dBody").addEventListener("click", e => { const b = e.target.closest("[data-dact]"); if (b) askDecision([$("#drawer").dataset.id], b.dataset.dact); });
+$("#dBody").addEventListener("click", e => {
+  const p = e.target.closest("[data-person]"); if (p) { closeDrawer(); return showPerson(p.dataset.person, true); }
+  const b = e.target.closest("[data-dact]"); if (b) askDecision([$("#drawer").dataset.id], b.dataset.dact); });
+// team member search: exact pick from the list as you type; Enter/blur takes the first partial match
+const findPerson = v => { v = v.trim().toLowerCase(); const ns = peopleNames(); return ns.find(n => n.toLowerCase() === v) || ns.find(n => n.toLowerCase().includes(v)); };
+$("#pSearch").addEventListener("input", e => { const v = e.target.value.trim(); if (!v || peopleNames().some(n => n.toLowerCase() === v.toLowerCase())) { person = v; renderPerson(); } });
+$("#pSearch").addEventListener("change", e => { const v = e.target.value.trim(); showPerson(v ? findPerson(v) || v : ""); });
+$("#pBody").addEventListener("click", e => {
+  if (e.target.closest("[data-ptable]")) { setF({ employee: all.find(r => (r.employee || "").toLowerCase() === person.toLowerCase())?.employee || person, status: "all" });
+    return $(".table-card").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" }); }
+  const tr = e.target.closest("tr[data-id]"); if (tr) openDrawer(tr.dataset.id); });
 // mark busy the instant Confirm is pressed (the dialog "close" event fires a task later)
 $("#mForm").addEventListener("submit", e => { if (e.submitter?.value === "ok") current.forEach(r => busy.add(r.id)); });
 $("#tpls").addEventListener("click", e => { const chip = e.target.closest("button"); if (!chip) return;
