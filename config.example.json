@@ -1,0 +1,5 @@
+{
+  "cc": ["manager@yourcompany.com"],
+  "query": "(from:greythr.com OR subject:\"Leave Application\") newer_than:120d",
+  "port": 8765
+}

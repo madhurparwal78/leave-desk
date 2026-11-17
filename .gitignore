@@ -1,0 +1,11 @@
+# personal data — never commit
+credentials.json
+gmail_token.json
+config.json
+team.json
+gmail_cache.json*
+decisions*.json*
+*.log
+.venv/
+__pycache__/
+.DS_Store

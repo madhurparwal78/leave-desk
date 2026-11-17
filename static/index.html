@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Review and approve greytHR leave requests from Gmail.">
+<title>Leave Desk · greytHR</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22><circle cx=%228%22 cy=%228%22 r=%227%22 fill=%22%23c6f36b%22/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<header class="top">
+  <div class="brand"><span class="logo">◐</span> Leave Desk <span id="mode" class="pill">…</span></div>
+  <div class="search"><input id="q" type="search" placeholder="Search name, ID, reason…  ( / )" aria-label="Search requests"></div>
+  <div class="actions">
+    <span id="synced" class="muted small"></span>
+    <button id="refresh" class="btn ghost" title="Re-sync mailbox">↻ Sync</button>
+    <button id="export" class="btn ghost" title="Download filtered rows as CSV">⇩ CSV</button>
+    <button id="theme" class="btn ghost icon" title="Toggle theme" aria-label="Toggle theme">☾</button>
+    <button id="help" class="btn ghost icon" title="Keyboard shortcuts" aria-label="Keyboard shortcuts">?</button>
+  </div>
+</header>
+<div id="banner" class="banner" hidden></div>
+
+<main>
+  <section class="kpis" id="kpis"></section>
+
+  <section class="grid two">
+    <div class="card">
+      <div class="card-h"><h2>Requests per week</h2><span class="muted small">last 12 weeks · click a bar to filter</span></div>
+      <div class="chart"><canvas id="cWeek" role="img" aria-label="Stacked bar chart of requests per week by status"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h2>By leave type</h2><span class="muted small">click to filter</span></div>
+      <div class="chart"><canvas id="cType" role="img" aria-label="Doughnut chart of requests by leave type"></canvas></div>
+    </div>
+  </section>
+
+  <section class="grid two rev">
+    <div class="card">
+      <div class="card-h cal-h">
+        <h2 id="calTitle">Who's off</h2>
+        <div class="calnav">
+          <button type="button" class="btn ghost icon" id="calPrev" aria-label="Previous month">‹</button>
+          <input type="month" id="calMonth" aria-label="Choose month">
+          <button type="button" class="btn ghost icon" id="calNext" aria-label="Next month">›</button>
+          <button type="button" class="btn ghost" id="calToday">Today</button>
+        </div>
+      </div>
+      <div class="cal-sum"><span id="calSum" class="muted small"></span><button type="button" class="linkbtn small" id="calTable">Show this month in table →</button></div>
+      <div id="heat" class="heat"></div>
+      <p class="muted small cal-foot">Leave only (approved, pending, no reply) · hover a day for names &amp; WFH · click a day to filter</p>
+    </div>
+    <div class="card">
+      <div class="card-h"><h2>Leave &amp; WFH days by person</h2><span class="muted small">click to filter</span></div>
+      <div class="chart"><canvas id="cPeople" role="img" aria-label="Bar chart of leave and work-from-home days per person"></canvas></div>
+    </div>
+  </section>
+
+  <section class="card table-card">
+    <div class="toolbar">
+      <div class="seg" id="seg" role="group" aria-label="Filter by status">
+        <button data-s="all">All</button><button data-s="pending">Pending</button><button data-s="approved">Approved</button><button data-s="rejected">Rejected</button><button data-s="stale">No reply</button>
+      </div>
+      <select id="type" aria-label="Leave type"><option value="">All types</option></select>
+      <label class="small muted">Leave from <input type="date" id="dFrom"></label>
+      <label class="small muted">to <input type="date" id="dTo"></label>
+      <div id="chips" class="chips"></div>
+      <div class="bulk" id="bulk" hidden>
+        <span id="selCount"></span>
+        <button class="btn ok" data-bulk="approved">✓ Approve selected</button>
+        <button class="btn bad" data-bulk="rejected">✕ Reject selected</button>
+      </div>
+    </div>
+    <div class="tbl-wrap">
+      <table id="tbl">
+        <thead><tr>
+          <th class="chk"><input type="checkbox" id="all" aria-label="Select all on page"></th>
+          <th data-k="employee">Employee</th><th data-k="type">Type</th><th data-k="from">Dates</th>
+          <th data-k="days" class="num">Days</th><th data-k="received">Applied</th><th data-k="status">Status</th><th class="act">Action</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+      <div id="empty" class="empty" hidden>Loading your mailbox…</div>
+    </div>
+    <div class="pager"><span id="pinfo" class="muted small"></span><div><button class="btn ghost" id="prev">‹</button><button class="btn ghost" id="next">›</button></div></div>
+  </section>
+</main>
+
+<aside id="drawer" class="drawer" aria-label="Request details" inert>
+  <div class="drawer-in">
+    <button class="btn ghost icon close" id="dClose" aria-label="Close">✕</button>
+    <div id="dBody"></div>
+  </div>
+</aside>
+<div id="scrim" class="scrim"></div>
+
+<dialog id="modal">
+  <form method="dialog" id="mForm">
+    <h3 id="mTitle"></h3>
+    <p id="mSub" class="muted small"></p>
+    <div class="tpls" id="tpls"></div>
+    <textarea id="mComment" rows="6" aria-label="Message to the employee"></textarea>
+    <div id="mPreview" class="mpreview" hidden></div>
+    <label class="row"><input type="checkbox" id="mReply" checked> Send reply email in the thread</label>
+    <label class="row" id="mToRow"><span class="muted small">To</span><input id="mTo" type="email" list="teamList" placeholder="employee email" autocomplete="off"></label>
+    <datalist id="teamList"></datalist>
+    <p class="muted small" id="mCc">Your Gmail signature is added below the message</p>
+    <p class="muted small" id="mNote"></p>
+    <div class="m-actions"><button value="cancel" class="btn ghost">Cancel</button><button value="ok" id="mOk" class="btn">Confirm</button></div>
+  </form>
+</dialog>
+
+<dialog id="keys">
+  <h3>Keyboard</h3>
+  <ul class="keylist">
+    <li><kbd>/</kbd> search</li><li><kbd>j</kbd>/<kbd>k</kbd> move row</li><li><kbd>Enter</kbd> open details</li>
+    <li><kbd>a</kbd> approve</li><li><kbd>r</kbd> reject</li><li><kbd>x</kbd> select row</li>
+    <li><kbd>1</kbd>–<kbd>5</kbd> status tabs</li><li><kbd>[</kbd>/<kbd>]</kbd> calendar month</li><li><kbd>Esc</kbd> close / clear</li>
+  </ul>
+  <form method="dialog"><button class="btn">Close</button></form>
+</dialog>
+
+<div id="tip" class="ftip" role="tooltip" hidden></div>
+<div id="toasts" class="toasts" aria-live="polite"></div>
+<script src="app.js"></script>
+</body>
+</html>
